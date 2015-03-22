@@ -1,7 +1,7 @@
 ---
-title: "Storm Data Analysis"
+title: "An Analysis of the Human and Economic Costs of Storm Events, from 1996 - 2011"
 author: "Casey Thomas"
-date: "March 15, 2015"
+date: "March 22, 2015"
 output: 
   html_document:
     keep_md: true
@@ -9,10 +9,20 @@ output:
 
 ## Snyopsis
 
-describes and summarizes your analysis in at most 10 complete sentences.
+Using historical storm event data provided by the U.S. National Oceanic and Atmospheric Administration (NOAA), this analysis seeks to answer the following questions:
+
+1. Across the United States, which types of events are most harmful with respect to population health?
+2. Across the United States, which types of events have the greatest economic consequences?
+
+The first section describes the necessary steps to obtain the data and prepare for analysis, while the second section contains analysis used to answer the above questions.
+
+This analysis shows that tornadoes have caused far more injuries than any storm type, but excessive heat events have caused more fatalities, while thunderstorm wind events and flooding events are the biggest cause of economic damage.
 
 ## Data Processing
-```{r setoptions, echo=TRUE, cache=TRUE}
+
+To preform the analysis, we must first download NOAA storm event data from 1950 - 2011. For more information about this data, see the [documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf). 
+
+```{r setoptions, echo=TRUE}
 library('dplyr')
 library('ggplot2')
 library('scales')
@@ -22,14 +32,71 @@ library('magrittr')
 
 setwd('~/git/data-science/RepData_PeerAssessment2/')
 
-data <- read.csv('data/repdata-data-StormData.csv', as.is = TRUE)
+file_url <- 'https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2'
+file_name <- 'repdata-data-StormData.csv.bz2'
+
+download.file(file_url, file_name, method='curl')
+
+data <- read.csv(bzfile(file_name), as.is = TRUE)
 ```
 
-Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+After we read in the data, we must clean it up and prepare it for analysis.
 
- 
-```{r, cache=FALSE}
-harmful_to_pop_by_type <- data %>%
+To make our operations faster, we keep only the fields we need for the analysis: those related to the event type, date, and human and economic impacts.
+
+```{r}
+data_trimmed <- data %>%
+  select(BGN_DATE, EVTYPE, FATALITIES, INJURIES, PROPDMG, PROPDMGEXP, CROPDMG, CROPDMGEXP)
+```
+
+According to NOAA, there are three eras of [event type reporting methodologies](http://www.ncdc.noaa.gov/stormevents/details.jsp?type=eventtype). To make sure we are only comparing data that was reported in the same way, we'll only analyze data from 1996 and forward; when event types were encoded in 48 distinct categories.
+
+```{r}
+data_trimmed$EVENTDATE <- as.POSIXct(data_trimmed$BGN_DATE, format='%m/%d/%Y')
+data_trimmed_1996_2011 <- filter(data_trimmed, EVENTDATE >= '1996-01-01')
+```
+
+Since we'll be doing an economic cost analysis of the storm events, we also have to convert the property and crop damage columns to appropriate U.S. dollar value.
+
+```{r}
+convert_to_usd <- function(dmg, multiplier) {
+  cost <- 0.00
+  
+  if (multiplier == 'K') {
+    cost <- dmg * 1000
+  } else if (multipler == 'M') {
+    cost <- dmg * 1000000  
+  } else if (multipler == 'B') {
+    cost <- dmg * 1000000000  
+  }
+  
+  cost
+}
+
+data_trimmed_1996_2011_w_costs <- data_trimmed_1996_2011 %>%
+  mutate(PROPCOST = convert_to_usd(PROPDMG, PROPDMGEXP),
+         CROPCOST = convert_to_usd(CROPDMG, CROPDMGEXP))
+```
+
+And despite using only the data collected under the most recent methodology, there are still event type categories that must be corrected. The correct types are listed in Section 2.1.1 of the data documentation.
+
+```{r}
+attach(data_trimmed_1996_2011_w_costs)
+data_trimmed_1996_2011_w_costs$EVTYPE[EVTYPE == 'TSTM WIND'] <- 'THUNDERSTORM WIND'
+data_trimmed_1996_2011_w_costs$EVTYPE[EVTYPE == 'HURRICANE/TYPHOON'] <- 'HURRICANE (TYPHOON)'
+data_trimmed_1996_2011_w_costs$EVTYPE[EVTYPE == 'WILD/FOREST FIRE'] <- 'WILDFIRE'
+data_trimmed_1996_2011_w_costs$EVTYPE[EVTYPE == 'RIP CURRENTS'] <- 'RIP CURRENT'
+detach(data_trimmed_1996_2011_w_costs)
+```
+
+## Results
+
+This first section of this analysis answers the question: *Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?*
+
+Tornadoes have caused far more injuries than any storm type, but excessive heat events have caused more fatalities.
+
+```{r}
+harmful_to_pop_by_type <- data_trimmed_1996_2011_w_costs %>%
   group_by(EVTYPE) %>%
   filter(FATALITIES > 0 | INJURIES > 0) %>%
   summarize(total_fatalities = sum(FATALITIES),
@@ -39,36 +106,65 @@ harmful_to_pop_by_type <- data %>%
           EVTYPE)
 
 harmful_to_pop_by_type
+```
 
+On the whole, tornadoes have had the biggest impact on humans and communities should make sure to be prepared for them. 
+
+```{r}
 harmful_to_pop_by_type %>%
   head(25) %>%
   melt(id.vars = "EVTYPE") %>%
   ggplot(aes(x = EVTYPE, y = value, fill = variable)) +
+    ggtitle("Population Impact of Storm Events By Type \n 1996 - 2011") +
+    labs(x = "Event Type", y = "Number of People") +
+    scale_fill_manual(values=c("#B5722B", "#2B6EB5"),
+                       name="Impact",
+                       breaks=c("total_fatalities", "total_injuries"),
+                       labels=c("Total Fatalities", "Total Injuries")) +
     geom_bar(stat = "Identity") +
     coord_flip()
 ```
 
-Across the United States, which types of events have the greatest economic consequences?
+Looking at the frequency of events that caused harm, lightning and thunderstorm wind events happen more often and also casue a significant amount of harm; meaning these types of events should be planned for as well.
 
-```{r, cache=FALSE}
-econ_damage_by_type <- data %>%
+```{r}
+most_frequent <- data_trimmed_1996_2011_w_costs %>%
   group_by(EVTYPE) %>%
-  filter(PROPDMG > 0 | CROPDMG > 0) %>%
-  summarize(total_propdmg = sum(PROPDMG),
-            total_cropdmg = sum(CROPDMG)) %>%
-  arrange(desc(total_propdmg),
-          desc(total_cropdmg),
-          EVTYPE)
+  filter(FATALITIES > 0 | INJURIES > 0) %>%
+  summarize(count = n(),
+            total_impact = sum(INJURIES + FATALITIES)) %>%
+  filter(count >= 100) %>%
+  arrange(desc(count))
 
+most_frequent
+```
+
+The next section of this analysis answers the question: *Across the United States, which types of events have the greatest economic consequences?*
+
+The below analysis shows that thunderstorm wind events cause the most economic damage. However, if you combine both types of flooding events (floods and flash floods), you will see that they cause more damage. 
+
+```{r}
+econ_damage_by_type <- data_trimmed_1996_2011_w_costs %>%
+  filter(PROPCOST > 0 | CROPCOST > 0) %>%
+  group_by(EVTYPE) %>%
+  summarize(total_propcost = sum(PROPCOST),
+            total_cropcost = sum(CROPCOST)) %>%
+  mutate(total_cost = total_propcost + total_cropcost) %>%
+  arrange(desc(total_cost), EVTYPE)
+
+econ_damage_by_type
+```
+
+The below bar chart shows the top 25 event types that cause the most damage.
+
+```{r}
 econ_damage_by_type %>%
   head(25) %>%
-  melt(id.vars = "EVTYPE") %>%
-  ggplot(aes(x = EVTYPE, y = value, fill = variable)) +
+  ggplot(aes(x = EVTYPE, y = total_cost)) +
     geom_bar(stat = "Identity") +
+    ggtitle("Economonic Impact of Storm Events By Type \n 1996 - 2011") +
+    labs(x = "Event Type", y = "Total Cost (USD)") +
+    scale_y_continuous(labels = dollar) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
     coord_flip()
 ```
-
-## Results
-
-Tornados are by far the most the natural disaster that is harmful with to people and property.
-
