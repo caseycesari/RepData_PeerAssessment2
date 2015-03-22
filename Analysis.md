@@ -9,9 +9,9 @@ Using historical storm event data provided by the U.S. National Oceanic and Atmo
 1. Across the United States, which types of events are most harmful with respect to population health?
 2. Across the United States, which types of events have the greatest economic consequences?
 
-The first section describes the necessary steps to obtain the data and prepare for analysis, while the second section details analysis used to answer the above questions.
+The first section describes the necessary steps to obtain the data and prepare for analysis, while the second section contains analysis used to answer the above questions.
 
-This analysis shows that tornadoes have caused far more injuries than any storm type, but excessive heat events have caused more fatalities, while thunderstorm wind events are the biggest cause of economic damage.
+This analysis shows that tornadoes have caused far more injuries than any storm type, but excessive heat events have caused more fatalities, while thunderstorm wind events and flooding events are the biggest cause of economic damage.
 
 ## Data Processing
 
@@ -62,7 +62,7 @@ data_trimmed <- data %>%
   select(BGN_DATE, EVTYPE, FATALITIES, INJURIES, PROPDMG, PROPDMGEXP, CROPDMG, CROPDMGEXP)
 ```
 
-According to NOAA, there are three eras of [event type encoding methodologies](http://www.ncdc.noaa.gov/stormevents/details.jsp?type=eventtype). To make sure we are only comparing data that was recorded in the same way, we'll only analyze data from 1996 and forward; when event types were encoded in 48 distinct categories.
+According to NOAA, there are three eras of [event type reporting methodologies](http://www.ncdc.noaa.gov/stormevents/details.jsp?type=eventtype). To make sure we are only comparing data that was reported in the same way, we'll only analyze data from 1996 and forward; when event types were encoded in 48 distinct categories.
 
 
 ```r

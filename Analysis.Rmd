@@ -59,14 +59,14 @@ data_trimmed_1996_2011 <- filter(data_trimmed, EVENTDATE >= '1996-01-01')
 Since we'll be doing an economic cost analysis of the storm events, we also have to convert the property and crop damage columns to appropriate U.S. dollar value.
 
 ```{r}
-convert_to_usd <- function(dmg, multiplier) {
+convert_to_usd <- function(dmg, units) {
   cost <- 0.00
   
-  if (multiplier == 'K') {
+  if (units[1] == 'K') {
     cost <- dmg * 1000
-  } else if (multipler == 'M') {
+  } else if (units[1] == 'M') {
     cost <- dmg * 1000000  
-  } else if (multipler == 'B') {
+  } else if (units[1] == 'B') {
     cost <- dmg * 1000000000  
   }
   
